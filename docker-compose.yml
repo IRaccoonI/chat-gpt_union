@@ -1,0 +1,90 @@
+services:
+  client:
+    build: chat-gpt_client
+    restart: always
+    ports:
+      - 3001:80
+    environment:
+      - GATEWAY_HOST=gateway
+      - GATEWAY_PORT=3000
+    depends_on:
+      - gateway
+
+  gateway:
+    build: chat-gpt_gateway
+    restart: always
+    ports:
+      - 3003:3000
+    environment:
+      # Important vpn, not proxy
+      - PROXY_HOST=vpn
+      - PROXY_PORT=3000
+
+      - DB_HOST=db
+      - DB_USER=postgres
+      - DB_PASSWORD=postgres
+      - DB_PORT=5432
+      - DB_NAME=gpt
+
+      - KEYCLOAK_HOST=http://keycloak:8080
+      - KEYCLOAK_REALM=master
+      - KEYCLOAK_CLIENTID=test
+      - KEYCLOAK_SECRET=t9jaHqTKaiMzmU92C64zkO5NHomHUWBD
+    depends_on:
+      - db
+      - keycloak
+
+  db:
+    image: postgres:14.1-alpine
+    restart: always
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=gpt
+    ports:
+      - "5433:5432"
+    volumes:
+      - db:/var/lib/postgresql/data
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:17.0
+    ports:
+      - 8085:8080
+    environment:
+      - KEYCLOAK_ADMIN=admin
+      - KEYCLOAK_ADMIN_PASSWORD=admin
+    command: start-dev
+    volumes:
+      - .local/keycloak/:/opt/jboss/keycloak/standalone/data/
+
+  proxy:
+    build: chat-gpt_proxy
+    restart: always
+    environment:
+      - PROXY_GPT_EMAIL=chatGpt@login #chatGpt login
+      - PROXY_GPT_PASSWORD=gptPassword #chatGpt password
+    network_mode: "service:vpn"
+    # ports to specify in vpn
+    depends_on:
+      - vpn
+
+  # you can not turn it on if the computer constantly has access to gpt
+  # move ports above
+  vpn:
+    image: qmcgaw/gluetun
+    container_name: vpn
+    cap_add:
+      - NET_ADMIN
+    environment:
+      - VPN_SERVICE_PROVIDER=private internet access
+      - VPN_TYPE=openvpn
+      - OPENVPN_USER=pia_login #PIA login
+      - OPENVPN_PASSWORD=pia_password #PIA password
+      - SERVER_REGIONS=US California
+    # ports from proxy service
+    ports:
+      - "0.0.0.0:3002:3000/tcp"
+
+volumes:
+  db:
+    driver: local

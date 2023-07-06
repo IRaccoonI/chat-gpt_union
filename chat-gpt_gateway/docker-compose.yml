@@ -1,0 +1,19 @@
+version: "3"
+services:
+  postgres:
+    image: postgres
+    restart: always
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_USER: myuser
+      POSTGRES_PASSWORD: mypassword
+      POSTGRES_DB: gpt
+    volumes:
+      - ./data:/var/lib/postgresql/data
+  gpt_gateway:
+    build: .
+    environment:
+      - name=value
+    ports:
+      - 8000:8000
